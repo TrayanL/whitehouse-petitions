@@ -1,25 +1,32 @@
-//
-//  ViewController.swift
-//  project7
-//
-//  Created by Trayan Lazarov on 17.05.22.
-//
-
 import UIKit
 
 class ViewController: UITableViewController {
     
+    var allPetitions = [Petition]()
     var petitions = [Petition]()
-
+    
     override func viewDidLoad() {
         super.viewDidLoad()
         
-        let urlString: String
+        navigationItem.rightBarButtonItem = UIBarButtonItem(title: "Rights",
+                                                            style: .plain,
+                                                            target: self,
+                                                            action: #selector(showDataSource))
         
-        if navigationController?.tabBarItem.tag == 0 {
-            urlString = "https://www.hackingwithswift.com/samples/petitions-1.json"
-        } else {
+        navigationItem.leftBarButtonItem = UIBarButtonItem(barButtonSystemItem: .search,
+                                                           target: self,
+                                                           action: #selector(searchPetitions))
+        
+        loadPetitions()
+    }
+    
+    func loadPetitions() {
+        let urlString: String
+        switch navigationController?.tabBarItem.tag {
+        case 1:
             urlString = "https://www.hackingwithswift.com/samples/petitions-2.json"
+        default:
+            urlString = "https://www.hackingwithswift.com/samples/petitions-1.json"
         }
         
         if let url = URL(string: urlString) {
@@ -28,20 +35,23 @@ class ViewController: UITableViewController {
                 return
             }
         }
+        
         showError()
     }
     
     func showError() {
-        let ac = UIAlertController(title: "Loading error", message: "There was a problem loading the feed. Please check your connection and try again.", preferredStyle: .alert)
+        let ac = UIAlertController(title: "Loading error",
+                                   message: "There was a problem loading the feed; please check your connection and try again.",
+                                   preferredStyle: .alert)
         ac.addAction(UIAlertAction(title: "OK", style: .default))
         present(ac, animated: true)
     }
     
     func parse(json: Data) {
         let decoder = JSONDecoder()
-        
         if let jsonPetitions = try? decoder.decode(Petitions.self, from: json) {
-            petitions = jsonPetitions.results
+            allPetitions = jsonPetitions.results
+            petitions = allPetitions
             tableView.reloadData()
         }
     }
@@ -49,13 +59,14 @@ class ViewController: UITableViewController {
     override func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
         return petitions.count
     }
-
+    
     override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         let cell = tableView.dequeueReusableCell(withIdentifier: "Cell", for: indexPath)
         
         let petition = petitions[indexPath.row]
         cell.textLabel?.text = petition.title
         cell.detailTextLabel?.text = petition.body
+        
         return cell
     }
     
@@ -64,5 +75,43 @@ class ViewController: UITableViewController {
         vc.detailItem = petitions[indexPath.row]
         navigationController?.pushViewController(vc, animated: true)
     }
+    
+    @objc func showDataSource() {
+        let ac = UIAlertController(title: "Data source",
+                                   message: "Data is recovered from We The People API of the Whitehouse",
+                                   preferredStyle: .alert)
+        ac.addAction(UIAlertAction(title: "OK", style: .default))
+        present(ac, animated: true)
+    }
+    
+    @objc func searchPetitions() {
+        let ac = UIAlertController(title: "Search petitions", message: nil, preferredStyle: .alert)
+        ac.addTextField()
+        
+        let searchAction = UIAlertAction(title: "Search", style: .default) { [weak self, weak ac] _ in
+            if let item = ac?.textFields?[0].text {
+                self?.performSelector(inBackground: #selector(self!.filterPetitionsContaining), with: item)
+            }
+        }
+        
+        ac.addAction(searchAction)
+        ac.addAction(UIAlertAction(title: "Clear current search", style: .default) { [weak self] _ in
+            self?.petitions = self!.allPetitions
+            self?.tableView.reloadData()
+        })
+        
+        ac.preferredAction = searchAction
+        present(ac, animated: true)
+    }
+    
+    @objc func filterPetitionsContaining(_ word: String) {
+        petitions = allPetitions.filter {
+            $0.title.localizedCaseInsensitiveContains(word)
+                || $0.body.localizedCaseInsensitiveContains(word)
+        }
+        
+        DispatchQueue.main.async {
+            self.tableView.reloadData()
+        }
+    }
 }
-
